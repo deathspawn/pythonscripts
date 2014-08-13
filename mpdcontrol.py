@@ -43,34 +43,34 @@ confexamplefile = configfile+".example"
 # This is a different Readme from the Github version.
 readmeversion = "1"
 readmelist = ["version = "+readmeversion,
-"Coming soon."]
+"""Coming soon."""]
 
 configversion = "1"
 exampleconfig = ["version = "+configversion,
-"# The line above is for internal version checks. Removing it will regenerate the conf.example only. This doesn't apply to the .conf.",
-"",
-"albumlength = 15",
-"",
-"# Format Variables:",
-"# %artist% = Artist",
-"# %album% = Album",
-"# %albumwrap% = Album shortened as defined by albumlength.",
-"# %title% = Title",
-"",
-"format = Listening to: %artist% - %title%",
-"notplaying = Not listening to anything!",
-"",
-"server = localhost",
-"port = 6600",
-"password = hackme",
-"",
-"# If you are like me and have another mpd session up, define it here.",
-"# This isn't functional yet.",
-"",
-"enabled = False",
-"server2 = localhost",
-"port2 = 6601",
-"password2 = hackmetoo"]
+"""# The line above is for internal version checks. Removing it will regenerate the conf.example only. This doesn't apply to the .conf.
+
+albumlength = 15
+
+# Format Variables:
+# %artist% = Artist
+# %album% = Album
+# %albumwrap% = Album shortened as defined by albumlength.
+# %title% = Title
+
+format = Listening to: %artist% - %title%
+notplaying = Not listening to anything!
+
+server = localhost
+port = 6600
+password = hackme
+
+# If you are like me and have another mpd session up, define it here.
+# This isn't functional yet.
+
+enabled = False
+server2 = localhost
+port2 = 6601
+password2 = hackmetoo"""]
 
 # Argument catcher.
 try:
