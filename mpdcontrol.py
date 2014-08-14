@@ -45,9 +45,15 @@ readmeversion = "1"
 readmelist = ["version = "+readmeversion,
 """Coming soon."""]
 
-configversion = "1"
+configversion = "2"
 exampleconfig = ["version = "+configversion,
 """# The line above is for internal version checks. Removing it will regenerate the conf.example only. This doesn't apply to the .conf.
+
+# Random song limit. If you feel like killing your mpd server, raise this number.
+
+randomlimit = 50
+
+# If you plan on using the %albumwrap% variable, you can set the length here.
 
 albumlength = 15
 
@@ -196,8 +202,25 @@ def random_song(number):
 
 # Internal commands can go here.
 if arguments.find("h") != -1:
-    print "This is a dud help output for now..."
+    print """
+          -h - Prints this help output.
+          -p - Prints the now playing info.
+          -r # - Adds a number of random songs to the playlist. See config for cap option.
+          -d - Debug. Prints the raw output for check_np()
+    """
     exit(0)
+# Any code that doesn't support multiple flags should end in an exit(0) and be before the multi-flag code.
+if arguments.find("r") != -1:
+    try:
+        randomsongs = int(sys.argv[2])
+    except IndexError:
+        exit("Error: Run "+sys.argv[0]+" -h for help.")
+    except ValueError:
+        exit("Error: Run "+sys.argv[0]+" -h for help.")
+    if randomsongs <= int(get_config("randomlimit")):
+        random_song(randomsongs)
+    else:
+        exit("Error: Value is higher than randomlimit in config.")
 if arguments.find("p") != -1:
     # Get some configuration items.
     albumlength = int(get_config("albumlength"))
@@ -224,8 +247,6 @@ if arguments.find("p") != -1:
         print get_config("notplaying")
     else:
         print reply
-    exit(0)
 if arguments.find("d") != -1:
     npquery = check_np()
     print npquery
-    exit(0)
