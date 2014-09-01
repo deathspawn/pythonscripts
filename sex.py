@@ -69,6 +69,6 @@ twat = "swamp.", "honeypot.","jam jar.", "butterbox.", "furburger.", "cherry pie
 
 # End of replies.
 
-altoghethernow = random.choice(faster) + " " + random.choice(said) + " " + the + " " + random.choice(fadj) + " " + random.choice(female) + " " + asthe + " " + random.choice(madjec) + " " + random.choice(male) + " " + random.choice(diddled) + " " + her + " " + random.choice(titadj) + " " + random.choice(knockers) + " " + andd + " " + random.choice(thrust) + " " + his + " " + random.choice(dongadj) + " " + random.choice(dong) + " " + intoher + " " + random.choice(twatadj) + " " + random.choice(twat)
+altogethernow = random.choice(faster) + " " + random.choice(said) + " " + the + " " + random.choice(fadj) + " " + random.choice(female) + " " + asthe + " " + random.choice(madjec) + " " + random.choice(male) + " " + random.choice(diddled) + " " + her + " " + random.choice(titadj) + " " + random.choice(knockers) + " " + andd + " " + random.choice(thrust) + " " + his + " " + random.choice(dongadj) + " " + random.choice(dong) + " " + intoher + " " + random.choice(twatadj) + " " + random.choice(twat)
 
 print altogethernow
