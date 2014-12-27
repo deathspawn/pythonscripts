@@ -23,7 +23,7 @@
 #
 
 # Import the necessary modules.
-import os, mpd, time, random, itertools, sys, urllib2
+import os, mpd, time, random, itertools, sys, urllib2, logging
 from xml.dom import minidom
 
 # Configurations for calling later...
@@ -32,12 +32,23 @@ api_folder = ".mpdcontrol"
 api_readme = "README"
 # Config file.
 api_config = "main.conf"
+# Log file.
+api_log = "mpdcontrol.log"
 # Define working directory here. Default is .deathspawn.
 configfolder = os.path.expanduser("~/")+"/.deathspawn/"+api_folder+"/"
 
 readmefile = configfolder+api_readme
 configfile = configfolder+api_config
 confexamplefile = configfile+".example"
+
+# Setup logger.
+logger = logging.getLogger('mpdcontrol')
+hdlr = logging.FileHandler(configfolder+api_log)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr)
+# Change log level here if needed.
+logger.setLevel(logging.WARNING)
 
 # Readme
 # This is a different Readme from the Github version.
@@ -200,53 +211,57 @@ def random_song(number):
         print "Added \""+songchoice+"\" to the playlist."
     client.disconnect()
 
-# Internal commands can go here.
-if arguments.find("h") != -1:
-    print """
-          -h - Prints this help output.
-          -p - Prints the now playing info.
-          -r # - Adds a number of random songs to the playlist. See config for cap option.
-          -d - Debug. Prints the raw output for check_np()
-    """
-    exit(0)
-# Any code that doesn't support multiple flags should end in an exit(0) and be before the multi-flag code.
-if arguments.find("r") != -1:
-    try:
-        randomsongs = int(sys.argv[2])
-    except IndexError:
-        exit("Error: Run "+sys.argv[0]+" -h for help.")
-    except ValueError:
-        exit("Error: Run "+sys.argv[0]+" -h for help.")
-    if randomsongs <= int(get_config("randomlimit")):
-        random_song(randomsongs)
-    else:
-        exit("Error: Value is higher than randomlimit in config.")
-if arguments.find("p") != -1:
-    # Get some configuration items.
-    albumlength = int(get_config("albumlength"))
-    npstring = get_config("format")
-    # Get information from servers.
-    npquery = check_np()
-    # Check if Server 2 is used.
-    if get_config("enabled") == True:
-        npquery2 = check_np2()
-        npinfo2 = npquery2[0]
-        status2 = npquery2[1]
-    else:
-        npinfo2 = ""
-        status2 = ""
-    npinfo = npquery[0]
-    status = npquery[1]
-    artist = npinfo.get("artist", "Unknown Artist")
-    album = npinfo.get("album", "Unknown Album")
-    albumwrap = (album[:15] + '...') if len(album) > 15 else album
-    title = npinfo.get("title", "Unknown Title")
-    # Replace the npstring variables.
-    reply = npstring.replace("%artist%", artist).replace("%album%", album).replace("%albumwrap%", albumwrap).replace("%title%", title)
-    if status.get("state", "Unknown") != "play":
-        print get_config("notplaying")
-    else:
-        print reply
-if arguments.find("d") != -1:
-    npquery = check_np()
-    print npquery
+try:
+    # Internal commands can go here.
+    if arguments.find("h") != -1:
+        print """
+              -h - Prints this help output.
+              -p - Prints the now playing info.
+              -r # - Adds a number of random songs to the playlist. See config for cap option.
+              -d - Debug. Prints the raw output for check_np()
+        """
+        exit(0)
+    # Any code that doesn't support multiple flags should end in an exit(0) and be before the multi-flag code.
+    if arguments.find("r") != -1:
+        try:
+            randomsongs = int(sys.argv[2])
+        except IndexError:
+            exit("Error: Run "+sys.argv[0]+" -h for help.")
+        except ValueError:
+            exit("Error: Run "+sys.argv[0]+" -h for help.")
+        if randomsongs <= int(get_config("randomlimit")):
+            random_song(randomsongs)
+        else:
+            exit("Error: Value is higher than randomlimit in config.")
+    if arguments.find("p") != -1:
+        # Get some configuration items.
+        albumlength = int(get_config("albumlength"))
+        npstring = get_config("format")
+        # Get information from servers.
+        npquery = check_np()
+        # Check if Server 2 is used.
+        if get_config("enabled") == True:
+            npquery2 = check_np2()
+            npinfo2 = npquery2[0]
+            status2 = npquery2[1]
+        else:
+            npinfo2 = ""
+            status2 = ""
+        npinfo = npquery[0]
+        status = npquery[1]
+        artist = npinfo.get("artist", "Unknown Artist")
+        album = npinfo.get("album", "Unknown Album")
+        albumwrap = (album[:15] + '...') if len(album) > 15 else album
+        title = npinfo.get("title", "Unknown Title")
+        # Replace the npstring variables.
+        reply = npstring.replace("%artist%", artist).replace("%album%", album).replace("%albumwrap%", albumwrap).replace("%title%", title)
+        if status.get("state", "Unknown") != "play":
+            print get_config("notplaying")
+        else:
+            print reply
+    if arguments.find("d") != -1:
+        npquery = check_np()
+        print npquery
+except:
+    # Log the error to the log file. Could optionally add an output to console here.
+    logger.error("We have a problem....", exc_info=1)
