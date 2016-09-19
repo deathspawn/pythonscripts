@@ -7,4 +7,4 @@ Various stand-alone scripts for python.
 
 * **sex.py** - A script that generates a random nsfw provacitive reply. Ported from a Linux command. Not exactly sure where said command source is.
 
-* **pirate.py** - A script that translates any input into Pirate language.
+* **pirate.py** - A script that translates any input into Pirate language. Use with single quotes to prevent escaping. e.g. /path/to/pirate.py 'something something'
