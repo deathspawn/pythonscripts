@@ -29,10 +29,11 @@ from urllib2 import urlopen
 try:
     arguments = sys.argv[1:]
 except IndexError:
-    exit("Error: Run "+sys.argv[0]+" <text to translate>")
+    exit("Error: Run "+sys.argv[0]+" \'<text to translate>\'")
 
 def pirate(jargon):
     phrase = (" ".join(jargon))
+    phrase = phrase.lstrip("\'").rstrip("\'")
     query = urlencode({ 'typing' : phrase.replace('<','{`{') })
     url = "http://postlikeapirate.com/AJAXtranslate.php?" + query
     doc = urlopen(url)
