@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+#!/usr/bin/python3
 #
 # Copyright (c) 2014 deathspawn
 #
@@ -23,8 +23,10 @@
 #
 
 # Import the necessary modules.
-import os, mpd, time, random, itertools, sys, urllib2, logging
+import os, time, random, itertools, sys, logging, time, mpd
 from xml.dom import minidom
+from dateutil.relativedelta import relativedelta as rd
+from configparser import RawConfigParser
 
 # Configurations for calling later...
 api_folder = ".mpdcontrol"
@@ -54,50 +56,71 @@ logger.setLevel(logging.WARNING)
 # This is a different Readme from the Github version.
 readmeversion = "1"
 readmelist = ["version = "+readmeversion,
-"""Coming soon."""]
+"""Coming soon. Run script with help to see help output."""]
 
-configversion = "2"
-exampleconfig = ["version = "+configversion,
-"""# The line above is for internal version checks. Removing it will regenerate the conf.example only. This doesn't apply to the .conf.
+configversion = "3"
+exampleconfig = ["[version]\nversion = "+configversion,
+"""# The line above is for internal version checks. Removing it will regenerate the
+# conf.example only. This doesn't apply to the .conf.
 
-# Random song limit. If you feel like killing your mpd server, raise this number.
-
-randomlimit = 50
-
-# If you plan on using the %albumwrap% variable, you can set the length here.
-
-albumlength = 15
-
+[format]
 # Format Variables:
 # %artist% = Artist
 # %album% = Album
 # %albumwrap% = Album shortened as defined by albumlength.
-# %title% = Title
-
-format = Listening to: %artist% - %title%
+# %title% = Track title
+# %elapsed% = Current position in song. Outputs as H:M:S if duration is an hour
+#             or more. Outputs M:S if duration is under an hour.
+# %duration% = Total time. Works the same as elapsed on output.
+# %date% = Album date.
+# %bitrate% = Outputs the bitrate as a number. You can add kbps after this tag.
+# %khz% = Outputs khz as a number. Add khz after the tag if you want.
+# %bits% = Outputs the bit as a number. Add -bit if you want.
+# %channel% = Outputs the channels as a number. Add channels if you want.
+# %format% = File format. Gets from the file extension. May not work if
+#            extension is missing.
+format = NP: %artist% - %title% (%album%) [%elapsed%/%duration%] (%date%) {%bitrate%kbps | %khz%khz:%bits%-bit:%channels%-channel |  %format%}
+# If the album and artist are unknown, this will be a fallback. Shoutcast MP3
+# streams often don't have an album/artist tag.
+alternate = NP: %title%
 notplaying = Not listening to anything!
+# If you plan on using the %albumwrap% variable, you can set the length here.
+albumlength = 15
 
-server = localhost
-port = 6600
+# This is currently out of order!
+[random]
+# Random song limit. If you feel like killing your mpd server, raise this
+# number.
+randomlimit = 50
+
+# You can add an infinite amount of servers. Just follow the same outline below.
+# You could also name them, just don't use format or random. :)
+# !! Please set a password on your server if you want to use this script. At the
+# moment, there is no support for an empty password. Support may come in a later
+# version.
+[default]
+server = 127.0.0.1
+port = 0
 password = hackme
 
-# If you are like me and have another mpd session up, define it here.
-# This isn't functional yet.
-
-enabled = False
-server2 = localhost
-port2 = 6601
-password2 = hackmetoo"""]
+[second]
+server = 192.168.1.2
+port = 0
+password = hackme2"""]
 
 # Argument catcher.
 try:
-    arguments = sys.argv[1]
+    option = sys.argv[1]
 except IndexError:
-    exit("Error: Run "+sys.argv[0]+" -h for help.")
+    exit("Error: Run "+sys.argv[0]+" help for help.")
+try:
+    servername = sys.argv[2]
+except:
+    servername = None
 
 # Check to see if the config folder exists.
 if not os.path.exists(configfolder):
-    print "Making configuration folder at "+configfolder
+    print("Making configuration folder at "+configfolder)
     # Make the folder...
     os.makedirs(configfolder)
 
@@ -149,19 +172,10 @@ if updateconfig == True:
     examplefilemake.close()
 
 # Used to get a config option.
-def get_config(variable):
-    config = open(configfile, "r")
-    configlist = config.readlines()
-    config.close()
-    for i in configlist:
-        try:
-            splitpea = i.split(" = ")
-        except IndexError:
-            pass
-        if splitpea:
-            if splitpea[0] == variable:
-                value = splitpea[1].rstrip("\n")
-    return value
+def get_config(section, variable):
+    parser = RawConfigParser()
+    parser.read(configfile)
+    return parser.get(section, variable)
 
 # MPD Connect function. Requires a server and port.
 def mpd_connect(mpdserver, mpdport):
@@ -170,10 +184,7 @@ def mpd_connect(mpdserver, mpdport):
     return mpd_client
 
 # First Check NP function.
-def check_np():
-    server = get_config("server")
-    port = get_config("port")
-    password = get_config("password")
+def check_np(server, port, password):
     client = mpd_connect(server, port)
     if password != "None":
         client.password(password)
@@ -183,85 +194,126 @@ def check_np():
     client.disconnect()
     return nowplaying, status, stats
 
-# 2nd Check NP function.
-def check_np2():
-    server = get_config("server2")
-    port = get_config("port2")
-    password = get_config("password2")
-    client = mpd_connect(server, port)
-    if password != "None":
-        client.password(password)
-    nowplaying = client.currentsong()
-    status = client.status()
-    stats = client.stats()
-    client.disconnect()
-    return nowplaying, status, stats
 
 # Random song function. Adds a # of songs.
-def random_song(number):
-    server = get_config("server")
-    port = get_config("port")
-    password = get_config("password")
+def random_song(number, server, port, password):
     client = mpd_connect(server, port)
     client.password(password)
     songlist = client.list('file')
     for _ in itertools.repeat(None, number):
         songchoice = random.choice(songlist)
         client.add(songchoice)
-        print "Added \""+songchoice+"\" to the playlist."
+        print("Added \""+songchoice+"\" to the playlist.")
     client.disconnect()
 
+# The good stuff.
 try:
-    # Internal commands can go here.
-    if arguments.find("h") != -1:
-        print """
-              -h - Prints this help output.
-              -p - Prints the now playing info.
-              -r # - Adds a number of random songs to the playlist. See config for cap option.
-              -d - Debug. Prints the raw output for check_np()
-        """
-        exit(0)
-    # Any code that doesn't support multiple flags should end in an exit(0) and be before the multi-flag code.
-    if arguments.find("r") != -1:
-        try:
-            randomsongs = int(sys.argv[2])
-        except IndexError:
-            exit("Error: Run "+sys.argv[0]+" -h for help.")
-        except ValueError:
-            exit("Error: Run "+sys.argv[0]+" -h for help.")
-        if randomsongs <= int(get_config("randomlimit")):
-            random_song(randomsongs)
+    if option.lower() == "help":
+        print("""
+              help - Prints this help output.
+              np <server> - Prints the now playing info. Include the name for the server according to the config.
+              nowplaying <server> - Same as np.
+              random <server> <number> - Out of order. Connection failures. :(
+              stats <server> - Prints stats for mpd database.
+              debug <server> - Debug. Prints the raw output for check_np()
+              """)
+    elif option.lower() == "random":
+        print("Out of order.")
+#         if servername == None:
+#             exit("Error: Run "+sys.argv[0]+" help for help.")
+#         else:
+#             server = get_config(servername, "server")
+#             port = get_config(servername, "port")
+#             password = get_config(servername, "password")
+#             try:
+#                 randomsongs = int(sys.argv[3])
+#             except IndexError:
+#                 exit("Error: Run "+sys.argv[0]+" help for help.")
+#             except ValueError:
+#                 exit("Error: Run "+sys.argv[0]+" help for help.")
+#             if randomsongs <= int(get_config("random", "randomlimit")):
+#                 random_song(randomsongs, server, port, password)
+#             else:
+#                 exit("Error: Value is higher than randomlimit in config.")
+    elif option.lower() == "np" or option.lower() == "nowplaying":
+        if servername == None:
+            exit("Error: Run "+sys.argv[0]+" help for help.")
         else:
-            exit("Error: Value is higher than randomlimit in config.")
-    if arguments.find("p") != -1:
-        # Get some configuration items.
-        albumlength = int(get_config("albumlength"))
-        npstring = get_config("format")
-        # Get information from servers.
-        npquery = check_np()
-        # Check if Server 2 is used.
-        if get_config("enabled") == True:
-            npquery2 = check_np2()
-            npinfo2 = npquery2[0]
-            status2 = npquery2[1]
+            server = get_config(servername, "server")
+            port = get_config(servername, "port")
+            password = get_config(servername, "password")
+            albumlength = int(get_config("format", "albumlength"))
+            npquery = check_np(server, port, password)
+            npinfo = npquery[0]
+            status = npquery[1]
+            artist = npinfo.get("artist", "Unknown Artist")
+            album = npinfo.get("album", "Unknown Album")
+            albumwrap = (album[:15] + '...') if len(album) > 15 else album
+            title = npinfo.get("title", "Unknown Title")
+            bitrate = status.get("bitrate", "?")
+            audioraw = status.get("audio", "?")
+            filepath = npinfo.get("file", "?.unknown")
+            try:
+                filename, fileextension = os.path.splitext(filepath)
+            except:
+                fileextension = ".unknown"
+            format_ = fileextension.lstrip(".")
+            if audioraw != "?":
+                audiolist = audioraw.split(":")
+                audiochannels = audiolist[2]
+                audiobits = audiolist[1]
+                audiokhz = audiolist[0]
+            else:
+                audiochannels = audioraw
+                audiobits = audioraw
+                audiokhz = audioraw
+            durationsec = int(float(status.get("duration", "0")))
+            if durationsec <= 3599:
+                duration = time.strftime('%M:%S', time.gmtime(durationsec))
+            else:
+                duration = time.strftime('%H:%M:%S', time.gmtime(durationsec))
+            elapsedsec = int(float(status.get("elapsed", "0")))
+            if durationsec <= 3599:
+                elapsed = time.strftime('%M:%S', time.gmtime(elapsedsec))
+            else:
+                elapsed = time.strftime('%H:%M:%S', time.gmtime(elapsedsec))
+            date = npinfo.get("date", "?")
+            if album != "Unknown Album" and artist != "Unknown Artist":
+                npstring = get_config("format", "format")
+                reply = npstring.replace("%artist%", artist).replace("%album%", album).replace("%albumwrap%", albumwrap).replace("%title%", title).replace("%bitrate%", bitrate).replace("%duration%", duration).replace("%elapsed%", elapsed).replace("%format%", format_).replace("%date%", date).replace("%bits%", audiobits).replace("%khz%", audiokhz).replace("%channels%", audiochannels)
+            else:
+                npstring = get_config("format", "alternate")
+                reply = npstring.replace("%artist%", artist).replace("%album%", album).replace("%albumwrap%", albumwrap).replace("%title%", title).replace("%bitrate%", bitrate).replace("%duration%", duration).replace("%elapsed%", elapsed).replace("%format%", format_).replace("%date%", date).replace("%bits%", audiobits).replace("%khz%", audiokhz).replace("%channels%", audiochannels)
+            if status.get("state", "Unknown") != "play":
+                print(get_config("format", "notplaying"))
+            else:
+                print(reply)
+    elif option.lower() == "stats":
+        if servername == None:
+            exit("Error: Run "+sys.argv[0]+" help for help.")
         else:
-            npinfo2 = ""
-            status2 = ""
-        npinfo = npquery[0]
-        status = npquery[1]
-        artist = npinfo.get("artist", "Unknown Artist")
-        album = npinfo.get("album", "Unknown Album")
-        albumwrap = (album[:15] + '...') if len(album) > 15 else album
-        title = npinfo.get("title", "Unknown Title")
-        # Replace the npstring variables.
-        reply = npstring.replace("%artist%", artist).replace("%album%", album).replace("%albumwrap%", albumwrap).replace("%title%", title)
-        if status.get("state", "Unknown") != "play":
-            print get_config("notplaying")
+            server = get_config(servername, "server")
+            port = get_config(servername, "port")
+            password = get_config(servername, "password")
+            npquery = check_np(server, port, password)
+            stats = npquery[2]
+            songs = stats.get("songs")
+            artists = stats.get("artists")
+            albums = stats.get("albums")
+            playtime = stats.get("db_playtime")
+            fmt = '{0.days} days, {0.hours} hours, {0.minutes} minutes, {0.seconds} seconds'
+            human_playtime = fmt.format(rd(seconds=int(playtime)))
+            human_playtime = str(human_playtime)
+            print("MPD Database Stats: "+songs+" songs, "+artists+" artists, "+albums+" albums. Total Playtime: "+human_playtime+".")
+    elif option.lower() == "debug":
+        if servername == None:
+            exit("Error: Run "+sys.argv[0]+" help for help.")
         else:
-            print reply
-    if arguments.find("d") != -1:
-        npquery = check_np()
-        print npquery
+            server = get_config(servername, "server")
+            port = get_config(servername, "port")
+            password = get_config(servername, "password")
+            npquery = check_np(server, port, password)
+            print(npquery)
 except:
     # Log the error to the log file. Could optionally add an output to console here.
     logger.error("We have a problem....", exc_info=1)
