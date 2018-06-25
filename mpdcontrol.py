@@ -23,81 +23,82 @@
 #
 
 # Import the necessary modules.
-import os, time, random, itertools, sys, logging, time, mpd
+import os, time, random, itertools, sys, logging, mpd
 from xml.dom import minidom
 from dateutil.relativedelta import relativedelta as rd
 from configparser import RawConfigParser
 
 # Configurations for calling later...
-api_folder = ".mpdcontrol"
-# Not the same as the git README.md.
-api_readme = "README"
+api_folder = "mpdcontrol"
 # Config file.
-api_config = "main.conf"
+api_config = "mpdcontrol.ini"
 # Log file.
 api_log = "mpdcontrol.log"
+# Example file.
+api_example = "example.ini"
+# TODO: XDG_CONFIG_HOME environ
+try:
+    homedir = os.environ['XDG_CONFIG_HOME']
+except KeyError:
+    try:
+        homedir = os.environ['HOME']
+    except KeyError:
+         homedir = os.path.expanduser("~")
 # Define working directory here. Default is .deathspawn.
-configfolder = os.path.expanduser("~/")+"/.deathspawn/"+api_folder+"/"
+configfolder = homedir+"/.config/"+api_folder+"/"
 
-readmefile = configfolder+api_readme
 configfile = configfolder+api_config
-confexamplefile = configfile+".example"
+confexamplefile = configfolder+api_example
+logfile = configfolder+api_log
 
-# Setup logger.
-logger = logging.getLogger('mpdcontrol')
-hdlr = logging.FileHandler(configfolder+api_log)
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-hdlr.setFormatter(formatter)
-logger.addHandler(hdlr)
-# Change log level here if needed.
-logger.setLevel(logging.WARNING)
+# Thanks Stack Overflow.
+class SafeDict(dict):
+    def __missing__(self, key):
+        return '{' + key + '}'
 
-# Readme
-# This is a different Readme from the Github version.
-readmeversion = "1"
-readmelist = ["version = "+readmeversion,
-"""Coming soon. Run script with help to see help output."""]
-
-configversion = "3"
-exampleconfig = ["[version]\nversion = "+configversion,
-"""# The line above is for internal version checks. Removing it will regenerate the
-# conf.example only. This doesn't apply to the .conf.
+configversion = "4"
+exampleconfig = """[version]
+version = {version}
+; The line above is for internal version checks. Removing it will regenerate the
+; conf.example only. This doesn't apply to the .conf.
 
 [format]
-# Format Variables:
-# %artist% = Artist
-# %album% = Album
-# %albumwrap% = Album shortened as defined by albumlength.
-# %title% = Track title
-# %elapsed% = Current position in song. Outputs as H:M:S if duration is an hour
-#             or more. Outputs M:S if duration is under an hour.
-# %duration% = Total time. Works the same as elapsed on output.
-# %date% = Album date.
-# %bitrate% = Outputs the bitrate as a number. You can add kbps after this tag.
-# %khz% = Outputs khz as a number. Add khz after the tag if you want.
-# %bits% = Outputs the bit as a number. Add -bit if you want.
-# %channel% = Outputs the channels as a number. Add channels if you want.
-# %format% = File format. Gets from the file extension. May not work if
-#            extension is missing.
-format = NP: %artist% - %title% (%album%) [%elapsed%/%duration%] (%date%) {%bitrate%kbps | %khz%khz:%bits%-bit:%channels%-channel |  %format%}
-# If the album and artist are unknown, this will be a fallback. Shoutcast MP3
-# streams often don't have an album/artist tag.
-alternate = NP: %title%
+; Format Variables:
+; {artist} = Artist
+; {album} = Album
+; {albumwrap} = Album shortened as defined by albumlength.
+; {title} = Track title
+; {elapsed} = Current position in song. Outputs as H:M:S if duration is an hour
+;             or more. Outputs M:S if duration is under an hour.
+; {duration} = Total time. Works the same as elapsed on output.
+; {date} = Album date.
+; {bitrate} = Outputs the bitrate as a number. You can add kbps after this tag.
+; {khz} = Outputs khz as a number. Add khz after the tag if you want.
+; {bits} = Outputs the bit as a number. Add -bit if you want.
+; {channel} = Outputs the channels as a number. Add channels if you want.
+; {extension} = File format. Gets from the file extension. May not work if
+;            extension is missing.
+; Warning! If you plan on using {}, please double them up like so: {{{extension}}} outputs to {flac} for example.
+format = NP: {artist} - {title} ({album}) [{elapsed}/{duration}] ({date}) {{{bitrate}kbps | {khz}khz:{bits}-bit:{channels}-channel | {extension}}} ~MPDControl~
+; If the album and artist are unknown, this will be a fallback. Shoutcast MP3
+; streams often don't have an album/artist tag.
+alternate = NP: {title}
 notplaying = Not listening to anything!
-# If you plan on using the %albumwrap% variable, you can set the length here.
+; If you plan on using the %albumwrap% variable, you can set the length here.
 albumlength = 15
 
-# This is currently out of order!
+; This is currently out of order!
 [random]
-# Random song limit. If you feel like killing your mpd server, raise this
-# number.
+; Random song limit. If you feel like killing your mpd server, raise this
+; number.
 randomlimit = 50
 
-# You can add an infinite amount of servers. Just follow the same outline below.
-# You could also name them, just don't use format or random. :)
-# !! Please set a password on your server if you want to use this script. At the
-# moment, there is no support for an empty password. Support may come in a later
-# version.
+; You can add an infinite amount of servers. Just follow the same outline below.
+; You could also name them, just don't use format or random. :)
+; !! Please set a password on your server if you want to use this script. At the
+; moment, there is no support for an empty password. Support may come in a later
+; version.
+
 [default]
 server = 127.0.0.1
 port = 0
@@ -106,13 +107,13 @@ password = hackme
 [second]
 server = 192.168.1.2
 port = 0
-password = hackme2"""]
+password = hackme2""".replace("{version}", configversion)
 
 # Argument catcher.
 try:
     option = sys.argv[1]
 except IndexError:
-    exit("Error: Run "+sys.argv[0]+" help for help.")
+    print("Error: Run "+sys.argv[0]+" help for help.")
 try:
     servername = sys.argv[2]
 except:
@@ -124,40 +125,26 @@ if not os.path.exists(configfolder):
     # Make the folder...
     os.makedirs(configfolder)
 
-# Check to see if the readme exists.
-if os.path.exists(readmefile):
-    readmeopen = open(readmefile, "r")
-    readmecheck = readmeopen.readline()
-    readmeopen.close()
-    # Version check.
-    if readmecheck != "version = "+readmeversion+"\n":
-        updatereadme = True
-    else:
-        updatereadme = False
-else:
-    updatereadme = True
+# Make log file if it doesn't exist.
+if not os.path.exists(logfile):
+    open(logfile, 'a').close()
 
-# Make or remake readme.
-if updatereadme == True:
-    readmefilemake = open(readmefile, "w")
-    for i in readmelist:
-        readmefilemake.write(i+"\n")
-    readmefilemake.close()
-
-# If config doesn't exist, make it. No version check here, so your changes don't get overwritten.
-if not os.path.exists(configfile):
-    configfilemake = open(configfile, "w")
-    for i in exampleconfig:
-        configfilemake.write(i+"\n")
-    configfilemake.close()
+# Setup logger.
+logger = logging.getLogger('mpdcontrol')
+hdlr = logging.FileHandler(logfile)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr)
+# Change log level here if needed.
+logger.setLevel(logging.WARNING)
 
 # Check to see if the config example exists
 if os.path.exists(confexamplefile):
-    exampleopen = open(confexamplefile, "r")
-    examplecheck = exampleopen.readline()
-    exampleopen.close()
+    parser = RawConfigParser()
+    parser.read(confexamplefile)
+    examplecheck = parser.get("version", "version")
     # Version check.
-    if examplecheck != "version = "+configversion+"\n":
+    if examplecheck != configversion:
         updateconfig = True
     else:
         updateconfig = False
@@ -166,10 +153,9 @@ else:
 
 # Update the config if needed.
 if updateconfig == True:
-    examplefilemake = open(confexamplefile, "w")
-    for i in exampleconfig:
-        examplefilemake.write(i+"\n")
-    examplefilemake.close()
+    with open(confexamplefile, "w") as examplefilemake:
+        for i in exampleconfig:
+            examplefilemake.write(i)
 
 # Used to get a config option.
 def get_config(section, variable):
@@ -209,18 +195,19 @@ def random_song(number, server, port, password):
 # The good stuff.
 try:
     if option.lower() == "help":
-        print("""
-              help - Prints this help output.
-              np <server> - Prints the now playing info. Include the name for the server according to the config.
-              nowplaying <server> - Same as np.
-              random <server> <number> - Out of order. Connection failures. :(
-              stats <server> - Prints stats for mpd database.
-              debug <server> - Debug. Prints the raw output for check_np()
-              """)
+        print(
+"""help - Prints this help output.
+np <server> - Prints the now playing info. Include the name for the server according to the config.
+nowplaying <server> - Same as np.
+random <server> <number> - Out of order. Connection failures. :(
+stats <server> - Prints stats for mpd database.
+debug <server> - Debug. Prints the raw output for check_np()
+
+Config directory is located at \""""+configfolder+"\".")
     elif option.lower() == "random":
         print("Out of order.")
 #         if servername == None:
-#             exit("Error: Run "+sys.argv[0]+" help for help.")
+#             print("Missing server name. Error: Run "+sys.argv[0]+" help for help.")
 #         else:
 #             server = get_config(servername, "server")
 #             port = get_config(servername, "port")
@@ -237,7 +224,7 @@ try:
 #                 exit("Error: Value is higher than randomlimit in config.")
     elif option.lower() == "np" or option.lower() == "nowplaying":
         if servername == None:
-            exit("Error: Run "+sys.argv[0]+" help for help.")
+            print("Missing server name. Error: Run "+sys.argv[0]+" help for help.")
         else:
             server = get_config(servername, "server")
             port = get_config(servername, "port")
@@ -257,7 +244,7 @@ try:
                 filename, fileextension = os.path.splitext(filepath)
             except:
                 fileextension = ".unknown"
-            format_ = fileextension.lstrip(".")
+            extension = fileextension.lstrip(".")
             if audioraw != "?":
                 audiolist = audioraw.split(":")
                 audiochannels = audiolist[2]
@@ -280,17 +267,17 @@ try:
             date = npinfo.get("date", "?")
             if album != "Unknown Album" and artist != "Unknown Artist":
                 npstring = get_config("format", "format")
-                reply = npstring.replace("%artist%", artist).replace("%album%", album).replace("%albumwrap%", albumwrap).replace("%title%", title).replace("%bitrate%", bitrate).replace("%duration%", duration).replace("%elapsed%", elapsed).replace("%format%", format_).replace("%date%", date).replace("%bits%", audiobits).replace("%khz%", audiokhz).replace("%channels%", audiochannels)
+                reply = npstring.format_map(SafeDict(artist=artist, album=album, albumwrap=albumwrap, title=title, bitrate=bitrate, duration=duration, elapsed=elapsed, extension=extension, date=date, bits=audiobits, khz=audiokhz, channels=audiochannels))
             else:
                 npstring = get_config("format", "alternate")
-                reply = npstring.replace("%artist%", artist).replace("%album%", album).replace("%albumwrap%", albumwrap).replace("%title%", title).replace("%bitrate%", bitrate).replace("%duration%", duration).replace("%elapsed%", elapsed).replace("%format%", format_).replace("%date%", date).replace("%bits%", audiobits).replace("%khz%", audiokhz).replace("%channels%", audiochannels)
+                reply = npstring.format_map(SafeDict(artist=artist, album=album, albumwrap=albumwrap, title=title, bitrate=bitrate, duration=duration, elapsed=elapsed, extension=extension, date=date, bits=audiobits, khz=audiokhz, channels=audiochannels))
             if status.get("state", "Unknown") != "play":
                 print(get_config("format", "notplaying"))
             else:
                 print(reply)
     elif option.lower() == "stats":
         if servername == None:
-            exit("Error: Run "+sys.argv[0]+" help for help.")
+            print("Error: Missing server name. Run "+sys.argv[0]+" help for help.")
         else:
             server = get_config(servername, "server")
             port = get_config(servername, "port")
@@ -307,7 +294,7 @@ try:
             print("MPD Database Stats: "+songs+" songs, "+artists+" artists, "+albums+" albums. Total Playtime: "+human_playtime+".")
     elif option.lower() == "debug":
         if servername == None:
-            exit("Error: Run "+sys.argv[0]+" help for help.")
+            print("Error: Missing server name. Run "+sys.argv[0]+" help for help.")
         else:
             server = get_config(servername, "server")
             port = get_config(servername, "port")
@@ -315,5 +302,8 @@ try:
             npquery = check_np(server, port, password)
             print(npquery)
 except:
-    # Log the error to the log file. Could optionally add an output to console here.
-    logger.error("We have a problem....", exc_info=1)
+    if not os.path.exists(configfile):
+        print("Please make a "+api_config+" in \""+configfolder+"\". There is a "+api_example+" provided for you there.")
+    else:
+        logger.error("We have a problem...", exc_info=1)
+        print("Error: This has been logged to \""+logfile+"\". Run "+sys.argv[0]+" help for help.")
