@@ -113,7 +113,7 @@ password = hackme2""".replace("{version}", configversion)
 try:
     option = sys.argv[1]
 except IndexError:
-    print("Error: Run "+sys.argv[0]+" help for help.")
+    exit("Error: Run "+sys.argv[0]+" help for help.")
 try:
     servername = sys.argv[2]
 except:
