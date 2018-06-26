@@ -173,9 +173,9 @@ def mpd_connect(mpdserver, mpdport):
     return mpd_client
 
 # Check NP function.
-def check_np(server, port, password):
+def check_np(server, port, password=None):
     client = mpd_connect(server, port)
-    if password != "None":
+    if password != None:
         client.password(password)
     nowplaying = client.currentsong()
     status = client.status()
@@ -183,10 +183,58 @@ def check_np(server, port, password):
     client.disconnect()
     return nowplaying, status, stats
 
+def get_currentsong(server, port, password=None):
+    albumlength = int(get_config("format", "albumlength"))
+    npquery = check_np(server, port, password)
+    npinfo = npquery[0]
+    status = npquery[1]
+    artist = npinfo.get("artist", "Unknown Artist")
+    album = npinfo.get("album", "Unknown Album")
+    albumwrap = (album[:15] + '...') if len(album) > 15 else album
+    title = npinfo.get("title", "Unknown Title")
+    bitrate = status.get("bitrate", "?")
+    audioraw = status.get("audio", "?")
+    filepath = npinfo.get("file", "?.unknown")
+    try:
+        filename, fileextension = os.path.splitext(filepath)
+    except:
+        fileextension = ".unknown"
+    extension = fileextension.lstrip(".")
+    if audioraw != "?":
+        audiolist = audioraw.split(":")
+        audiochannels = audiolist[2]
+        audiobits = audiolist[1]
+        audiokhz = audiolist[0]
+    else:
+        audiochannels = audioraw
+        audiobits = audioraw
+        audiokhz = audioraw
+    durationsec = int(float(status.get("duration", "0")))
+    if durationsec <= 3599:
+        duration = time.strftime('%M:%S', time.gmtime(durationsec))
+    else:
+        duration = time.strftime('%H:%M:%S', time.gmtime(durationsec))
+    elapsedsec = int(float(status.get("elapsed", "0")))
+    if durationsec <= 3599:
+        elapsed = time.strftime('%M:%S', time.gmtime(elapsedsec))
+    else:
+        elapsed = time.strftime('%H:%M:%S', time.gmtime(elapsedsec))
+    date = npinfo.get("date", "?")
+    if album != "Unknown Album" and artist != "Unknown Artist":
+        npstring = get_config("format", "format")
+        reply = npstring.format_map(SafeDict(artist=artist, album=album, albumwrap=albumwrap, title=title, bitrate=bitrate, duration=duration, elapsed=elapsed, extension=extension, date=date, bits=audiobits, khz=audiokhz, channels=audiochannels))
+    else:
+        npstring = get_config("format", "alternate")
+        reply = npstring.format_map(SafeDict(artist=artist, album=album, albumwrap=albumwrap, title=title, bitrate=bitrate, duration=duration, elapsed=elapsed, extension=extension, date=date, bits=audiobits, khz=audiokhz, channels=audiochannels))
+    if status.get("state", "Unknown") != "play":
+        return get_config("format", "notplaying")
+    else:
+        return reply
+
 # Main interaction with MPD.
-def mpd_control(function, options=None):
+def mpd_control(function, server, port, password=None, options=None):
     client = mpd_connect(server, port)
-    if password != "None":
+    if password != None:
         client.password(password)
     if function == "consume" or function == "random" or function == "single" or function == "repeat":
         if options == "true" or options == "on" or options == "1":
@@ -229,43 +277,19 @@ def mpd_control(function, options=None):
     else:
         if function == "next":
             client.next()
-            nowplaying = client.currentsong()
-            title = nowplaying.get("title", "Unknown Title")
-            artist = nowplaying.get("artist", "Unknown Artist")
-            album = nowplaying.get("album", "Unknown Album")
-            songinfo = title
-            if artist != "Unknown Artist":
-                songinfo = songinfo+" by "+artist
-            if album != "Unknown Album":
-                songinfo = songinfo+" from "+album
-            return "Switched to next song. Now playing "+songinfo+"."
+            time.sleep(1)
+            return "Switched to next song. "+get_currentsong(server, port, password)
         elif function == "pause":
             client.pause()
             return "Paused track."
         elif function == "play":
             client.play()
-            nowplaying = client.currentsong()
-            title = nowplaying.get("title", "Unknown Title")
-            artist = nowplaying.get("artist", "Unknown Artist")
-            album = nowplaying.get("album", "Unknown Album")
-            songinfo = title
-            if artist != "Unknown Artist":
-                songinfo = songinfo+" by "+artist
-            if album != "Unknown Album":
-                songinfo = songinfo+" from "+album
-            return "Now playing "+songinfo+"."
+            time.sleep(1)
+            return get_currentsong(server, port, password)
         elif function == "previous":
             client.previous()
-            nowplaying = client.currentsong()
-            title = nowplaying.get("title", "Unknown Title")
-            artist = nowplaying.get("artist", "Unknown Artist")
-            album = nowplaying.get("album", "Unknown Album")
-            songinfo = title
-            if artist != "Unknown Artist":
-                songinfo = songinfo+" by "+artist
-            if album != "Unknown Album":
-                songinfo = songinfo+" from "+album
-            return "Switched to previous song. Now playing "+songinfo+"."
+            time.sleep(1)
+            return "Switched to previous song. "+get_currentsong(server, port, password)
         elif function == "stop":
             client.stop()
             return "Stopped playback."
@@ -332,52 +356,7 @@ Config directory is located at \""""+configfolder+"\".")
             server = get_config(servername, "server")
             port = get_config(servername, "port")
             password = get_config(servername, "password")
-            albumlength = int(get_config("format", "albumlength"))
-            npquery = check_np(server, port, password)
-            npinfo = npquery[0]
-            status = npquery[1]
-            artist = npinfo.get("artist", "Unknown Artist")
-            album = npinfo.get("album", "Unknown Album")
-            albumwrap = (album[:15] + '...') if len(album) > 15 else album
-            title = npinfo.get("title", "Unknown Title")
-            bitrate = status.get("bitrate", "?")
-            audioraw = status.get("audio", "?")
-            filepath = npinfo.get("file", "?.unknown")
-            try:
-                filename, fileextension = os.path.splitext(filepath)
-            except:
-                fileextension = ".unknown"
-            extension = fileextension.lstrip(".")
-            if audioraw != "?":
-                audiolist = audioraw.split(":")
-                audiochannels = audiolist[2]
-                audiobits = audiolist[1]
-                audiokhz = audiolist[0]
-            else:
-                audiochannels = audioraw
-                audiobits = audioraw
-                audiokhz = audioraw
-            durationsec = int(float(status.get("duration", "0")))
-            if durationsec <= 3599:
-                duration = time.strftime('%M:%S', time.gmtime(durationsec))
-            else:
-                duration = time.strftime('%H:%M:%S', time.gmtime(durationsec))
-            elapsedsec = int(float(status.get("elapsed", "0")))
-            if durationsec <= 3599:
-                elapsed = time.strftime('%M:%S', time.gmtime(elapsedsec))
-            else:
-                elapsed = time.strftime('%H:%M:%S', time.gmtime(elapsedsec))
-            date = npinfo.get("date", "?")
-            if album != "Unknown Album" and artist != "Unknown Artist":
-                npstring = get_config("format", "format")
-                reply = npstring.format_map(SafeDict(artist=artist, album=album, albumwrap=albumwrap, title=title, bitrate=bitrate, duration=duration, elapsed=elapsed, extension=extension, date=date, bits=audiobits, khz=audiokhz, channels=audiochannels))
-            else:
-                npstring = get_config("format", "alternate")
-                reply = npstring.format_map(SafeDict(artist=artist, album=album, albumwrap=albumwrap, title=title, bitrate=bitrate, duration=duration, elapsed=elapsed, extension=extension, date=date, bits=audiobits, khz=audiokhz, channels=audiochannels))
-            if status.get("state", "Unknown") != "play":
-                print(get_config("format", "notplaying"))
-            else:
-                print(reply)
+            print(get_currentsong(server, port, password))
     elif option == "stats":
         if servername == None:
             print("Error: Missing server name. Run "+sys.argv[0]+" help for help.")
@@ -423,13 +402,13 @@ Config directory is located at \""""+configfolder+"\".")
                 if variable == None:
                     print("Error: Missing variable. Run "+sys.argv[0]+" help for help.")
                 else:
-                    reply = mpd_control(option, variable)
+                    reply = mpd_control(option, server, port, password, variable)
                     if reply == "Invalid var":
                         print("Error: Invalid variable. Run "+sys.argv[0]+" help for help.")
                     else:
                         print(reply)
             elif option == "next" or option == "pause" or option == "play" or option == "previous" or option == "stop":
-                reply = mpd_control(option)
+                reply = mpd_control(option, server, port, password)
                 if reply == "Invalid var":
                     print("Error: Invalid variable. Run "+sys.argv[0]+" help for help.")
                 else:
