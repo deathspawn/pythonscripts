@@ -191,42 +191,84 @@ def mpd_control(function, options=None):
     if function == "consume" or function == "random" or function == "single" or function == "repeat":
         if options == "true" or options == "on" or options == "1":
             options = 1
+            reply = "on"
         elif options == "false" or options == "off" or options == "0":
             options = 0
+            reply = "off"
         else:
             return "Invalid var"
         if function == "consume":
             client.consume(options)
+            return "Consume is now "+reply+"."
         elif function == "random":
             client.random(options)
+            return "Random is now "+reply+"."
         elif function == "single":
             client.single(options)
+            return "Single is now "+reply+"."
         elif function == "repeat":
             client.repeat(options)
+            return "Repeat is now "+reply+"."
     elif function == "crossfade" or function == "volume":
         try:
             options = int(options)
         except ValueError:
             return "Invalid var"
         if function == "crossfade":
+            if options <= -1:
+                options = 0
             client.crossfade(options)
+            return "Crossfade is now "+str(options)+" seconds."
         elif function == "volume":
             if options >= 101:
                 options = 100
             elif options <= -1:
                 options = 0
             client.setvol(options)
+            return "Volume is now "+str(options)+"."
     else:
         if function == "next":
             client.next()
+            nowplaying = client.currentsong()
+            title = nowplaying.get("title", "Unknown Title")
+            artist = nowplaying.get("artist", "Unknown Artist")
+            album = nowplaying.get("album", "Unknown Album")
+            songinfo = title
+            if artist != "Unknown Artist":
+                songinfo = songinfo+" by "+artist
+            if album != "Unknown Album":
+                songinfo = songinfo+" from "+album
+            return "Switched to next song. Now playing "+songinfo+"."
         elif function == "pause":
             client.pause()
+            return "Paused track."
         elif function == "play":
             client.play()
+            nowplaying = client.currentsong()
+            title = nowplaying.get("title", "Unknown Title")
+            artist = nowplaying.get("artist", "Unknown Artist")
+            album = nowplaying.get("album", "Unknown Album")
+            songinfo = title
+            if artist != "Unknown Artist":
+                songinfo = songinfo+" by "+artist
+            if album != "Unknown Album":
+                songinfo = songinfo+" from "+album
+            return "Now playing "+songinfo+"."
         elif function == "previous":
             client.previous()
+            nowplaying = client.currentsong()
+            title = nowplaying.get("title", "Unknown Title")
+            artist = nowplaying.get("artist", "Unknown Artist")
+            album = nowplaying.get("album", "Unknown Album")
+            songinfo = title
+            if artist != "Unknown Artist":
+                songinfo = songinfo+" by "+artist
+            if album != "Unknown Album":
+                songinfo = songinfo+" from "+album
+            return "Switched to previous song. Now playing "+songinfo+"."
         elif function == "stop":
             client.stop()
+            return "Stopped playback."
 
 
 # Random song function. Adds a # of songs.
@@ -381,11 +423,17 @@ Config directory is located at \""""+configfolder+"\".")
                 if variable == None:
                     print("Error: Missing variable. Run "+sys.argv[0]+" help for help.")
                 else:
-                    if mpd_control(option, variable) == "Invalid var":
+                    reply = mpd_control(option, variable)
+                    if reply == "Invalid var":
                         print("Error: Invalid variable. Run "+sys.argv[0]+" help for help.")
+                    else:
+                        print(reply)
             elif option == "next" or option == "pause" or option == "play" or option == "previous" or option == "stop":
-                if mpd_control(option) == "Invalid var":
+                reply = mpd_control(option)
+                if reply == "Invalid var":
                     print("Error: Invalid variable. Run "+sys.argv[0]+" help for help.")
+                else:
+                    print(reply)
             elif option == None:
                 print("Error: Missing or unknown option. Run "+sys.argv[0]+" help for help.")
 except:
