@@ -372,7 +372,7 @@ Config directory is located at \""""+configfolder+"\".")
             try:
                 option = sys.argv[3].lower()
             except:
-                print("Error: Missing option. Run "+sys.argv[0]+" help for help.")
+                option = None
             try:
                 variable = sys.argv[4].lower()
             except:
@@ -381,11 +381,13 @@ Config directory is located at \""""+configfolder+"\".")
                 if variable == None:
                     print("Error: Missing variable. Run "+sys.argv[0]+" help for help.")
                 else:
-                    mpd_control(option, variable)
+                    if mpd_control(option, variable) == "Invalid var":
+                        print("Error: Invalid variable. Run "+sys.argv[0]+" help for help.")
             elif option == "next" or option == "pause" or option == "play" or option == "previous" or option == "stop":
-                mpd_control(option)
-            else:
-                print("Error: Unknown option. Run "+sys.argv[0]+" help for help.")
+                if mpd_control(option) == "Invalid var":
+                    print("Error: Invalid variable. Run "+sys.argv[0]+" help for help.")
+            elif option == None:
+                print("Error: Missing or unknown option. Run "+sys.argv[0]+" help for help.")
 except:
     if not os.path.exists(configfile):
         print("Please make a "+api_config+" in \""+configfolder+"\". There is a "+api_example+" provided for you there.")
