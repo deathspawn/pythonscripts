@@ -111,8 +111,8 @@ password = hackme2""".replace("{version}", configversion)
 
 # Argument catcher.
 try:
-    option = sys.argv[1]
-except IndexError:
+    option = sys.argv[1].lower()
+except:
     exit("Error: Run "+sys.argv[0]+" help for help.")
 try:
     servername = sys.argv[2]
@@ -172,7 +172,7 @@ def mpd_connect(mpdserver, mpdport):
     mpd_client.connect(mpdserver, mpdport)
     return mpd_client
 
-# First Check NP function.
+# Check NP function.
 def check_np(server, port, password):
     client = mpd_connect(server, port)
     if password != "None":
@@ -182,6 +182,51 @@ def check_np(server, port, password):
     stats = client.stats()
     client.disconnect()
     return nowplaying, status, stats
+
+# Main interaction with MPD.
+def mpd_control(function, options=None):
+    client = mpd_connect(server, port)
+    if password != "None":
+        client.password(password)
+    if function == "consume" or function == "random" or function == "single" or function == "repeat":
+        if options == "true" or options == "on" or options == "1":
+            options = 1
+        elif options == "false" or options == "off" or options == "0":
+            options = 0
+        else:
+            return "Invalid var"
+        if function == "consume":
+            client.consume(options)
+        elif function == "random":
+            client.random(options)
+        elif function == "single":
+            client.single(options)
+        elif function == "repeat":
+            client.repeat(options)
+    elif function == "crossfade" or function == "volume":
+        try:
+            options = int(options)
+        except ValueError:
+            return "Invalid var"
+        if function == "crossfade":
+            client.crossfade(options)
+        elif function == "volume":
+            if options >= 101:
+                options = 100
+            elif options <= -1:
+                options = 0
+            client.setvol(options)
+    else:
+        if function == "next":
+            client.next()
+        elif function == "pause":
+            client.pause()
+        elif function == "play":
+            client.play()
+        elif function == "previous":
+            client.previous()
+        elif function == "stop":
+            client.stop()
 
 
 # Random song function. Adds a # of songs.
@@ -197,7 +242,7 @@ def random_song(number, server, port, password):
 
 # The good stuff.
 try:
-    if option.lower() == "help":
+    if option == "help":
         print(
 """help - Prints this help output.
 np <server> - Prints the now playing info. Include the name for the server according to the config.
@@ -205,9 +250,22 @@ nowplaying <server> - Same as np.
 random <server> <number> - Out of order. Connection failures. :(
 stats <server> - Prints stats for mpd database.
 debug <server> - Debug. Prints the raw output for check_np()
+control <server> <option> - Perform various actions on the server. See below for options.
+    Options:
+        consume 0|1, true|false, on|off - Sets consume on or off.
+        crossfade <seconds> - Sets crossfade to amount of seconds.
+        random 0|1, true|false, on|off - Sets random on or off.
+        single 0|1, true|false, on|off - Sets single on or off.
+        repeat 0|1, true|false, on|off - Sets repeat on or off.
+        volume 0-100 - Sets volume.
+        next - Goes to next track.
+        pause - Pauses playback.
+        play - Resumes playback or starts playing.
+        previous - Goes to previous track.
+        stop - Stops playback.
 
 Config directory is located at \""""+configfolder+"\".")
-    elif option.lower() == "random":
+    elif option == "random":
         print("Out of order.")
 #         if servername == None:
 #             print("Missing server name. Error: Run "+sys.argv[0]+" help for help.")
@@ -225,7 +283,7 @@ Config directory is located at \""""+configfolder+"\".")
 #                 random_song(randomsongs, server, port, password)
 #             else:
 #                 exit("Error: Value is higher than randomlimit in config.")
-    elif option.lower() == "np" or option.lower() == "nowplaying":
+    elif option == "np" or option.lower() == "nowplaying":
         if servername == None:
             print("Missing server name. Error: Run "+sys.argv[0]+" help for help.")
         else:
@@ -278,7 +336,7 @@ Config directory is located at \""""+configfolder+"\".")
                 print(get_config("format", "notplaying"))
             else:
                 print(reply)
-    elif option.lower() == "stats":
+    elif option == "stats":
         if servername == None:
             print("Error: Missing server name. Run "+sys.argv[0]+" help for help.")
         else:
@@ -295,7 +353,7 @@ Config directory is located at \""""+configfolder+"\".")
             human_playtime = fmt.format(rd(seconds=int(playtime)))
             human_playtime = str(human_playtime)
             print("MPD Database Stats: "+songs+" songs, "+artists+" artists, "+albums+" albums. Total Playtime: "+human_playtime+".")
-    elif option.lower() == "debug":
+    elif option == "debug":
         if servername == None:
             print("Error: Missing server name. Run "+sys.argv[0]+" help for help.")
         else:
@@ -304,6 +362,30 @@ Config directory is located at \""""+configfolder+"\".")
             password = get_config(servername, "password")
             npquery = check_np(server, port, password)
             print(npquery)
+    elif option == "control":
+        if servername == None:
+            print("Error: Missing server name. Run "+sys.argv[0]+" help for help.")
+        else:
+            server = get_config(servername, "server")
+            port = get_config(servername, "port")
+            password = get_config(servername, "password")
+            try:
+                option = sys.argv[3].lower()
+            except:
+                print("Error: Missing option. Run "+sys.argv[0]+" help for help.")
+            try:
+                variable = sys.argv[4].lower()
+            except:
+                variable = None
+            if option == "consume" or option == "random" or option == "single" or option == "volume" or option == "crossfade" or option == "repeat":
+                if variable == None:
+                    print("Error: Missing variable. Run "+sys.argv[0]+" help for help.")
+                else:
+                    mpd_control(option, variable)
+            elif option == "next" or option == "pause" or option == "play" or option == "previous" or option == "stop":
+                mpd_control(option)
+            else:
+                print("Error: Unknown option. Run "+sys.argv[0]+" help for help.")
 except:
     if not os.path.exists(configfile):
         print("Please make a "+api_config+" in \""+configfolder+"\". There is a "+api_example+" provided for you there.")
