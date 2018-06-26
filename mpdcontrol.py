@@ -183,6 +183,7 @@ def check_np(server, port, password=None):
     client.disconnect()
     return nowplaying, status, stats
 
+# Get NP output.
 def get_currentsong(server, port, password=None):
     albumlength = int(get_config("format", "albumlength"))
     npquery = check_np(server, port, password)
@@ -293,6 +294,16 @@ def mpd_control(function, server, port, password=None, options=None):
         elif function == "stop":
             client.stop()
             return "Stopped playback."
+        elif function == "toggle":
+            npquery = check_np(server, port, password)
+            status = npquery[1]
+            if status.get("state", "Unknown") != "play":
+                client.play()
+                time.sleep(1)
+                return get_currentsong(server, port, password)
+            else:
+                client.pause()
+                return "Paused playback."
 
 
 # Random song function. Adds a # of songs.
@@ -329,6 +340,7 @@ control <server> <option> - Perform various actions on the server. See below for
         play - Resumes playback or starts playing.
         previous - Goes to previous track.
         stop - Stops playback.
+        toggle - Toggles between play/pause.
 
 Config directory is located at \""""+configfolder+"\".")
     elif option == "random":
@@ -407,7 +419,7 @@ Config directory is located at \""""+configfolder+"\".")
                         print("Error: Invalid variable. Run "+sys.argv[0]+" help for help.")
                     else:
                         print(reply)
-            elif option == "next" or option == "pause" or option == "play" or option == "previous" or option == "stop":
+            elif option == "next" or option == "pause" or option == "play" or option == "previous" or option == "stop" or option == "toggle":
                 reply = mpd_control(option, server, port, password)
                 if reply == "Invalid var":
                     print("Error: Invalid variable. Run "+sys.argv[0]+" help for help.")
