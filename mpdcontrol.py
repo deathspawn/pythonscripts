@@ -36,7 +36,7 @@ api_config = "mpdcontrol.ini"
 api_log = "mpdcontrol.log"
 # Example file.
 api_example = "example.ini"
-# TODO: XDG_CONFIG_HOME environ
+
 try:
     homedir = os.environ['XDG_CONFIG_HOME']
 except KeyError:
@@ -142,7 +142,10 @@ logger.setLevel(logging.WARNING)
 if os.path.exists(confexamplefile):
     parser = RawConfigParser()
     parser.read(confexamplefile)
-    examplecheck = parser.get("version", "version")
+    try:
+        examplecheck = parser.get("version", "version")
+    except:
+        examplecheck = None
     # Version check.
     if examplecheck != configversion:
         updateconfig = True
@@ -157,10 +160,10 @@ if updateconfig == True:
         for i in exampleconfig:
             examplefilemake.write(i)
 
-# Used to get a config option.
+# Interact with config.
+parser = RawConfigParser()
+parser.read(configfile)
 def get_config(section, variable):
-    parser = RawConfigParser()
-    parser.read(configfile)
     return parser.get(section, variable)
 
 # MPD Connect function. Requires a server and port.
